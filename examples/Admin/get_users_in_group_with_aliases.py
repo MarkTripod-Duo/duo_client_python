@@ -2,13 +2,29 @@
 Example of how to extract users and their aliases for a specific group from the Duo Admin API
 """
 
-import sys
 import argparse
 import dataclasses
+import re
+import sys
 from collections import deque
+
 from duo_client import Admin
 
 DUO_MAX_USERS_PER_API_CALL = 100
+group_name_match = re.compile(r"""
+    ^                           # Beginning of string
+    (?P<group_name>.*)          # First group match, labeled 'group_name' containing any characters
+    \s                          # A single whitespace character
+    (?P<sync_str>\(.*\))        # Second group match, labeled 'sync_str' containing any characters between ()
+    $                           # End of string
+""", re.VERBOSE | re.IGNORECASE)
+group_sync_pattern = re.compile(r"""
+    \(from                      # Match open parentheses with the word 'from' following it
+    \s.*                        # Followed by a single whitespace character and then any number of characters
+    \ssync                      # Until a single whitespace character is encountered, followed by the word 'sync'
+    \s.*                        # With a single whitespace character, followed by any number of characters
+    $                           # Until the end of the string
+""", re.VERBOSE | re.IGNORECASE)
 
 
 @dataclasses.dataclass
@@ -21,43 +37,33 @@ class DuoUser:
     group_name: str = None
     aliases: str = None
 
-    def set_group_name(self, group_name):
+    def set_group_name(self, group_name: str) -> None:
+        """Sets the group name for the user instance"""
         self.group_name = group_name
 
-    def set_aliases(self, aliases: list):
+    def set_aliases(self, aliases: list) -> None:
+        """Sets the aliases for the user instance"""
         self.aliases = ','.join(aliases)
 
-    def get_user_info(self):
-        return_string = (f"'username': {self.username}, 'user_id': {self.user_id}, " +
-                         f"'group_name': {self.group_name}, 'aliases': '{self.aliases}'")
-        return return_string
+    def get_user_info(self) -> str:
+        """Returns the user information for the user instance as a string for easy output"""
+        return (
+                f"'username': {self.username}, 'user_id': {self.user_id}, " + f"'group_name': {self.group_name}, 'aliases': '{self.aliases}'")
 
 
+# Collect required information from the terminal
 parser = argparse.ArgumentParser()
-duo_arg_group = parser.add_argument_group('Duo Admin API Credentials')
-duo_arg_group.add_argument('--ikey',
-                           help='Duo Admin API IKEY',
-                           required=True
-                           )
-duo_arg_group.add_argument('--skey',
-                           help='Duo Admin API Secret Key',
-                           required=True,
-                           )
-duo_arg_group.add_argument('--host',
-                           help='Duo Admin API apihost',
-                           required=True
-                           )
-parser.add_argument('--group_name',
-                    help="Name of group to get users from. Groups are case-sensitive.",
-                    required=True
-                    )
+duo_adm_arg_group = parser.add_argument_group('Duo Admin API Credentials')
+duo_adm_arg_group.add_argument('--ikey', nargs='?', help='Duo Admin API IKEY', required=True)
+duo_adm_arg_group.add_argument('--skey', nargs='?', help='Duo Admin API Secret Key', required=True)
+duo_adm_arg_group.add_argument('--host', nargs='?', help='Duo Admin API apihost', required=True)
+duo_arg_group = parser.add_argument_group('Required Arguments')
+duo_arg_group.add_argument('--group_name', nargs='?',
+                           help="Name of group to get users from. Groups are case-sensitive. " + "If there are spaces in the group name, enclose the value in double quotes (\")",
+                           required=True)
 args = parser.parse_args()
 
-duo_admin_client = Admin(
-        ikey=args.ikey,
-        skey=args.skey,
-        host=args.host
-)
+duo_admin_client = Admin(ikey=args.ikey, skey=args.skey, host=args.host)
 
 
 def split_list(input_list: list, size: int) -> list:
@@ -75,7 +81,19 @@ def get_duo_group_users(group_name: str) -> list:
         sys.exit(1)
 
     for group in groups:
-        if group['name'] == group_name:
+        # Groups created by a directory sync operation have a sync identifier string appended to the name
+        # Here we search for that pattern
+        re_search = group_sync_pattern.search(group['name'])
+        if re_search:
+            # If the directory sync identifier pattern is found, then we run another search
+            # to extract the actual group name portion
+            re_name_search = group_name_match.search(group['name'])
+            if re_name_search and re_name_search.group('group_name') == group_name:
+                # If that group name pattern matched, then we record the group ID
+                group_id = group['group_id']
+                break
+        # If there is no directory sync identifier in the group name, then we just look for a simple name match
+        elif group['name'] == group_name:
             group_id = group['group_id']
             break
 
