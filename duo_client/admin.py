@@ -174,16 +174,17 @@ the following fields:
 """
 from __future__ import absolute_import
 
-import six.moves.urllib
-
-from . import client, Accounts
-from .logs.telephony import Telephony
-import six
-import warnings
+import base64
 import json
 import time
-import base64
+import warnings
 from datetime import datetime, timedelta, timezone
+
+import six
+import six.moves.urllib
+
+from . import Accounts, client
+from .logs.telephony import Telephony
 
 USER_STATUS_ACTIVE = "active"
 USER_STATUS_BYPASS = "bypass"
@@ -2540,6 +2541,20 @@ class Admin(client.Client):
             '/admin/v2/integrations/' + integration_key,
             params,
         )
+        return response
+
+    def get_integration_skey(self, integration_key):
+        """
+        Returns the skey for requested integration.
+
+        integration_key - The ikey of the integration to get
+
+        Returns the skey of the requested integration object.
+
+        Raises RuntimeError on error.
+        """
+        params = {}
+        response = self.json_api_call('GET', '/admin/v1/integrations/' + integration_key + '/skey', params, )
         return response
 
     def create_integration(self,

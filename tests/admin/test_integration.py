@@ -1,7 +1,7 @@
-from .. import util
 import json
-import duo_client.admin
+
 from .base import TestAdmin
+from .. import util
 
 
 class TestIntegration(TestAdmin):
@@ -15,6 +15,14 @@ class TestIntegration(TestAdmin):
 
         self.assertEqual(response['method'], 'GET')
         self.assertEqual(uri, '/admin/v2/integrations/{}'.format(self.integration_key))
+        self.assertEqual(util.params_to_dict(args), {'account_id': [self.client.account_id]})
+
+    def test_get_integration_skey(self):
+        response = self.client.get_integration_skey(self.integration_key)
+        (uri, args) = response['uri'].split('?')
+
+        self.assertEqual(response['method'], 'GET')
+        self.assertEqual(uri, '/admin/v1/integrations/{}/skey'.format(self.integration_key))
         self.assertEqual(util.params_to_dict(args), {'account_id': [self.client.account_id]})
 
     def test_delete_integration(self):
@@ -73,6 +81,3 @@ class TestIntegration(TestAdmin):
                 },
             }
         )
-
-if __name__ == '__main__':
-    unittest.main()
