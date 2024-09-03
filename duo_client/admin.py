@@ -941,16 +941,31 @@ class Admin(client.Client):
 
         return self.json_api_call('POST', path, params)
 
-    def add_user_bypass_codes(self, user_id, count=None, valid_secs=None, remaining_uses=None, codes=None, preserve_existing=None):
+    def add_user_bypass_codes(
+        self, 
+        user_id, 
+        count=None, 
+        valid_secs=None, 
+        remaining_uses=None, 
+        codes=None, 
+        preserve_existing=None,
+        endpoint_verification=None,
+    ):
         """
-        Replace a user's bypass codes with new codes.
+        Generate bypass codes for user.
+        Replaces a user's bypass codes with new codes unless
+        `preserve_existing=True` is passed.
 
-        user_id - User ID
-        count - Number of new codes to randomly generate
-        valid_secs - Seconds before codes expire (if 0 they will never expire)
-        remaining_uses - The number of times this code can be used (0 is unlimited)
-        codes - Optionally provide custom codes, otherwise will be random
-        count and codes are mutually exclusive
+        user_id                 User ID
+        count                   Number of new codes to randomly generate
+        valid_secs              Seconds before codes expire (if 0 they will never expire)
+        remaining_uses          The number of times this code can be used (0 is unlimited)
+        codes                   Optionally provide custom codes, otherwise will be random
+                                count and codes are mutually exclusive
+        preserve_existing       whether to preserve existing codes when creating new ones,
+                                default is to remove existing bypass codes
+        endpoint_verification   New argument for unreleased feature. Will be ignored if used.
+                                Client will be updated again in the future when feature is released.
 
         Returns a list of newly created codes.
 
@@ -965,6 +980,9 @@ class Admin(client.Client):
 
         if valid_secs is not None:
             params['valid_secs'] = str(int(valid_secs))
+
+        if endpoint_verification is not None:
+            params["endpoint_verification"] = str(endpoint_verification).lower()
 
         if remaining_uses is not None:
             params['reuse_count'] = str(int(remaining_uses))
@@ -2651,7 +2669,70 @@ class Admin(client.Client):
         )
         return response
 
-    def get_secret_key (self, integration_key):
+    def get_registered_devices_generator(self):
+        """
+        Returns a generator yielding Duo Desktop registered devices.
+        """
+        return self.json_paging_api_call('GET', '/admin/v1/registered_devices', {})
+
+    def get_registered_devices(self, limit=None, offset=0):
+        """
+        Retrieves a list of Duo Desktop registered devices.
+
+        Args:
+            limit: The max number of registered devices to fetch at once. [Default: None]
+            offset: If a 'limit' is passed, the offset to start retrieval.
+                    [Default: 0]
+
+        Returns:
+            list of registered devices
+
+        Raises:
+            RuntimeError on error.
+
+        """
+        (limit, offset) = self.normalize_paging_args(limit, offset)
+        if limit:
+            return self.json_api_call('GET', '/admin/v1/registered_devices', {'limit': limit, 'offset': offset})
+
+        return list(self.get_registered_devices_generator())
+
+    def get_registered_device_by_id(self, registered_device_id):
+        """
+        Returns a Duo Desktop registered device specified by registered_device_id (compkey).
+
+        Args:
+            registered_device_id - Duo Desktop registered device compkey
+
+        Returns:
+            registered device object.
+
+        Raises:
+             RuntimeError on error.
+        """
+        path = '/admin/v1/registered_devices/' + registered_device_id
+        response = self.json_api_call('GET', path, {})
+        return response
+
+    def delete_registered_device(self, registered_device_id):
+        """
+        Deletes a Duo Desktop registered device. If the registered device has already been deleted,
+        does nothing.
+
+        Args:
+            registered_device_id - Duo Desktop registered device ID (compkey).
+
+        Returns:
+             None
+
+        Raises:
+             RuntimeError on error.
+        """
+        path = '/admin/v1/registered_devices/' + urllib.parse.quote_plus(registered_device_id)
+        params = {}
+        return self.json_api_call('DELETE', path, params)
+
+    def get_secret_key(self, integration_key):
         """Returns the secret key of the specified integration.
 
         integration_key - The ikey of the secret key to get.
