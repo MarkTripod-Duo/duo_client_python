@@ -2155,6 +2155,8 @@ class Admin(client.Client):
                                         mobile_otp_enabled=None,
                                         yubikey_enabled=None,
                                         hardware_token_enabled=None,
+                                        verified_push_enabled=None,
+                                        verified_push_length=None
                                         ):
         params = {}
         if push_enabled is not None:
@@ -2175,6 +2177,12 @@ class Admin(client.Client):
         if voice_enabled is not None:
             params['voice_enabled'] = (
                 '1' if voice_enabled else '0')
+        if verified_push_enabled is not None:
+            params['verified_push_enabled'] = (
+                '1' if verified_push_enabled else '0')
+            if params['verified_push_enabled'] == '1':
+                params['verified_push_length'] = (
+                    verified_push_length if verified_push_length is not None else 3)
         response = self.json_api_call(
             'POST',
             '/admin/v1/admins/allowed_auth_methods',
@@ -3617,13 +3625,76 @@ class Admin(client.Client):
         response = self.json_api_call("GET", path, {})
         return response
 
+    def calculate_policy(self, integration_key, user_id):
+        """
+        Args:
+            integration_key - The integration_key of the application to evaluate. (required)
+            user_id - The user_id of the user to evaluate (required)
+
+        Returns (dict) - Dictionary containing "policy_elements" and "sections"
+        """
+
+        path = "/admin/v2/policies/calculate"
+        response = self.json_api_call(
+            "GET",
+            path,
+            {"integration_key": integration_key, "user_id": user_id},
+        )
+        return response
+
     def get_passport_config(self):
         """
-        Returns the current Passport configuration.
+        Retrieve the current Passport configuration.
+
+        Returns (dict):
+            {
+                "enabled_status": string,
+                "enabled_groups": [
+                    {
+                        "group_id": user group ID,
+                        "group_name": descriptive user group name,
+                        ...
+                    },
+                    ...
+                ]
+                "disabled_groups": [
+                    {
+                        "group_id": user group ID,
+                        "group_name": descriptive user group name,
+                        ...
+                    },
+                    ...
+                ]
+            }
         """
 
         path = "/admin/v2/passport/config"
         response = self.json_api_call("GET", path, {})
+        return response
+
+    def update_passport_config(self, enabled_status, enabled_groups=[], disabled_groups=[]):
+        """
+        Update the current Passport configuration.
+
+        Args:
+            enabled_status (str) - one of "disabled", "enabled", "enabled-for-groups",
+                or "enabled-with-exceptions"
+            enabled_groups (list[str]) - if enabled_status is "enabled-for-groups", a
+                list of user group IDs for whom Passport should be enabled
+            disabled_groups (list[str]) - if enabled_status is "enabled-with-exceptions",
+                a list of user group IDs for whom Passport should be disabled
+        """
+
+        path = "/admin/v2/passport/config"
+        response = self.json_api_call(
+            "POST",
+            path,
+            {
+                "enabled_status": enabled_status,
+                "enabled_groups": enabled_groups,
+                "disabled_groups": disabled_groups,
+            },
+        )
         return response
 
 
