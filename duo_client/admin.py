@@ -2838,6 +2838,8 @@ class Admin(client.Client):
         if name is not None:
             params['name'] = name
         if visual_style is not None:
+            warnings.warn("The 'visual_style' parameter is unused and may be removed in future versions.",
+                          DeprecationWarning, stacklevel=2)
             params['visual_style'] = visual_style
         if greeting is not None:
             params['greeting'] = greeting
