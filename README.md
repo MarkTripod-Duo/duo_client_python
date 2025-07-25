@@ -20,6 +20,7 @@
 * 3.9
 * 3.10
 * 3.11
+* 3.12
 
 ## Requirements
 Duo_client_python supports Python 3.7 and higher
@@ -55,7 +56,7 @@ See the `examples` folder for how to use this library.
 
 To run an example query, execute a command like the following from the repo root:
 ```
-$ python examples/report_users_and_phones.py
+$ python examples/Admin/report_users_and_phones.py
 ```
 
 # Testing
